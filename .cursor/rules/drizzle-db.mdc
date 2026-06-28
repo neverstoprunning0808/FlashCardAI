@@ -1,0 +1,88 @@
+---
+alwaysApply: true
+---
+
+# Drizzle ORM Database Rules
+
+This project uses **Drizzle ORM** for all database interactions. All database operations must use the schema and queries defined in [src/db/schema.ts](mdc:src/db/schema.ts).
+
+## Schema Overview
+
+The database schema defines the following tables:
+
+- **decks**: User flashcard decks with name, description, and timestamps
+- **cards**: Individual flashcards belonging to decks (cascade delete)
+
+## Required Practices
+
+### 1. Import Schema Tables
+
+Always import table definitions from the schema file:
+
+```typescript
+import { decks, cards } from "@/db/schema"
+```
+
+### 2. Use Drizzle Query Builder
+
+Use Drizzle's query builder methods for all database operations:
+
+```typescript
+import { db } from "@/db"
+import { decks, cards } from "@/db/schema"
+import { eq, and, desc } from "drizzle-orm"
+
+// SELECT
+const userDecks = await db.select().from(decks).where(eq(decks.userId, userId))
+
+// INSERT
+const [newDeck] = await db.insert(decks).values({
+  userId,
+  name: "My Deck",
+  description: "Description"
+}).returning()
+
+// UPDATE
+await db.update(decks)
+  .set({ name: "Updated Name", updatedAt: new Date() })
+  .where(eq(decks.id, deckId))
+
+// DELETE
+await db.delete(cards).where(eq(cards.deckId, deckId))
+```
+
+### 3. Type Safety
+
+All queries must be type-checked against the schema. Use Drizzle's inferred types:
+
+```typescript
+import type { InferSelectModel, InferInsertModel } from "drizzle-orm"
+import { decks } from "@/db/schema"
+
+type Deck = InferSelectModel<typeof decks>
+type NewDeck = InferInsertModel<typeof decks>
+```
+
+### 4. Joins and Relations
+
+Use Drizzle's join syntax for multi-table queries:
+
+```typescript
+const decksWithCards = await db
+  .select()
+  .from(decks)
+  .leftJoin(cards, eq(cards.deckId, decks.id))
+  .where(eq(decks.userId, userId))
+```
+
+## Restrictions
+
+- **No raw SQL queries** unless Drizzle does not support the operation
+- **No ORM bypass**: Don't use direct database client methods
+- **Always use schema types**: Never hardcode table/column names as strings
+- **Validate at schema level**: Use schema constraints, not application logic
+- **Update timestamps**: Always update `updatedAt` when modifying records
+
+## Database Connection
+
+Ensure you have a properly configured database connection client exported from a db module that Drizzle can use. Reference this client in all queries.

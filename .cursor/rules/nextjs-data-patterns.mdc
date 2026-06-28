@@ -1,0 +1,128 @@
+---
+alwaysApply: true
+---
+# Next.js Data Handling Patterns
+
+This project follows strict patterns for data operations and validation.
+
+## Data Retrieval
+
+All data fetching must be done in **Server Components**:
+
+```typescript
+// ✅ CORRECT - Server Component
+import { db } from "@/db"
+import { decks } from "@/db/schema"
+import { auth } from "@clerk/nextjs/server"
+
+export default async function DecksPage() {
+  const { userId } = await auth()
+  const userDecks = await db.select().from(decks).where(eq(decks.userId, userId))
+  
+  return <div>{/* render decks */}</div>
+}
+```
+
+```typescript
+// ❌ INCORRECT - Client component fetching
+"use client"
+import { useEffect, useState } from "react"
+
+export default function DecksPage() {
+  const [decks, setDecks] = useState([])
+  useEffect(() => {
+    fetch('/api/decks').then(/* ... */) // Don't do this
+  }, [])
+}
+```
+
+## Data Mutations
+
+All database updates, deletes, and inserts must be done via **Server Actions**:
+
+```typescript
+// ✅ CORRECT - Server Action in separate file
+"use server"
+
+import { db } from "@/db"
+import { decks } from "@/db/schema"
+import { auth } from "@clerk/nextjs/server"
+import { z } from "zod"
+import { revalidatePath } from "next/cache"
+
+const createDeckSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().optional()
+})
+
+type CreateDeckInput = z.infer<typeof createDeckSchema>
+
+export async function createDeck(input: CreateDeckInput) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+  
+  const validated = createDeckSchema.parse(input)
+  
+  const [deck] = await db.insert(decks).values({
+    userId,
+    ...validated
+  }).returning()
+  
+  revalidatePath("/decks")
+  return deck
+}
+```
+
+```typescript
+// ❌ INCORRECT - Using FormData type
+export async function createDeck(formData: FormData) { // Don't use FormData as type
+  const name = formData.get("name")
+  // ...
+}
+
+// ❌ INCORRECT - No validation
+export async function createDeck(input: any) { // Don't skip validation
+  await db.insert(decks).values(input)
+}
+```
+
+## Zod Validation
+
+All data passed to server actions must be validated with Zod and have a TypeScript type:
+
+```typescript
+// ✅ CORRECT - Zod schema with inferred type
+const updateDeckSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(100),
+  description: z.string().optional()
+})
+
+type UpdateDeckInput = z.infer<typeof updateDeckSchema>
+
+export async function updateDeck(input: UpdateDeckInput) {
+  const validated = updateDeckSchema.parse(input) // Validates and throws on error
+  // ... perform update
+}
+```
+
+## Required Practices
+
+- **Server Components**: Always fetch data in server components, never in client components
+- **Server Actions**: Mark mutation functions with `"use server"` directive
+- **Zod Schemas**: Define a Zod schema for every server action input
+- **TypeScript Types**: Use `z.infer<typeof schema>` to create TypeScript types from Zod schemas
+- **Validation**: Call `.parse()` or `.safeParse()` on all server action inputs
+- **No FormData Types**: Never use `FormData` as a parameter type; extract and validate data with Zod
+- **Revalidation**: Call `revalidatePath()` or `revalidateTag()` after mutations to update cached data
+
+## File Organization
+
+```
+app/
+├── decks/
+│   ├── page.tsx           # Server component (data fetching)
+│   └── actions.ts         # Server actions (mutations)
+└── components/
+    └── deck-form.tsx      # Client component (UI only)
+```

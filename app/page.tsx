@@ -1,9 +1,29 @@
 import Image from "next/image";
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-900">
+      <header className="w-full flex items-center justify-end px-16 py-4 border-b border-zinc-200 dark:border-zinc-800 dark:bg-black">
+        <Show when="signed-out">
+          <div className="flex gap-3">
+            <SignInButton mode="modal">
+              <button className="flex h-10 items-center justify-center rounded-full border border-solid bg-green-600 border-black/8 px-5 transition-colors hover:border-transparent hover:bg-black/4 dark:border-white/[.145] dark:hover:bg-[#926c6c]">
+                Sign In
+              </button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="flex h-10 items-center justify-center rounded-full bg-blue-500 px-5 transition-colors hover:bg-[#645757] dark:hover:bg-[#535283]">
+                Sign Up
+              </button>
+            </SignUpButton>
+          </div>
+        </Show>
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
+      </header>
+      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-zinc-900 sm:items-start">
         <Image
           className="dark:invert"
           src="/next.svg"
@@ -45,8 +65,8 @@ export default function Home() {
               className="dark:invert"
               src="/vercel.svg"
               alt="Vercel logomark"
-              width={16}
-              height={16}
+              width={8}
+              height={8}
             />
             Deploy Now
           </a>

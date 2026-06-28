@@ -1,0 +1,82 @@
+---
+alwaysApply: true
+---
+    })
+    .returning()
+  
+  return deck
+}
+```
+
+## Common Patterns
+
+### Creating Resources
+
+Always set `userId` when creating new resources:
+
+```typescript
+const [newDeck] = await db
+  .insert(decks)
+  .values({
+    userId, // Required - ties resource to user
+    name,
+    description
+  })
+  .returning()
+```
+
+### Updating Resources
+
+Verify ownership before allowing updates:
+
+```typescript
+const result = await db
+  .update(decks)
+  .set({ name: "Updated Name", updatedAt: new Date() })
+  .where(and(
+    eq(decks.id, deckId),
+    eq(decks.userId, userId) // Critical - prevents updating others' data
+  ))
+  .returning()
+
+if (result.length === 0) {
+  return new Response("Not found or unauthorized", { status: 404 })
+}
+```
+
+### Deleting Resources
+
+Verify ownership before deletion:
+
+```typescript
+const result = await db
+  .delete(decks)
+  .where(and(
+    eq(decks.id, deckId),
+    eq(decks.userId, userId) // Critical - prevents deleting others' data
+  ))
+  .returning()
+
+if (result.length === 0) {
+  return new Response("Not found or unauthorized", { status: 404 })
+}
+```
+
+## Security Checklist
+
+Before committing any data access code, verify:
+
+- [ ] `auth()` is called to get `userId`
+- [ ] `userId` is checked for null/undefined
+- [ ] All queries filter by `userId`
+- [ ] Resource ownership is verified before operations
+- [ ] No raw queries expose data across users
+- [ ] API routes return 401 for unauthenticated requests
+- [ ] API routes return 404 for unauthorized resource access
+
+## References
+
+- Setup guide: [CLERK_SETUP.md](mdc:CLERK_SETUP.md)
+- Middleware configuration: [middleware.ts](mdc:middleware.ts)
+- Database schema: [src/db/schema.ts](mdc:src/db/schema.ts)
+- Clerk documentation: https://clerk.com/docs

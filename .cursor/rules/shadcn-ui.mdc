@@ -1,0 +1,41 @@
+---
+alwaysApply: true
+---
+# shadcn/ui
+
+This project uses **shadcn/ui** for all UI elements. Do not build custom primitives (buttons, inputs, dialogs, etc.) from scratch when a shadcn component exists.
+
+## Setup
+
+If shadcn/ui is not initialized (no [components.json](mdc:components.json)), run:
+
+```bash
+npx shadcn@latest init
+```
+
+## Adding components
+
+Before using a component, check if it exists in [components/ui/](mdc:components/ui). If not, install it:
+
+```bash
+npx shadcn@latest add button
+```
+
+Replace `button` with the component name (e.g., `card`, `dialog`, `input`).
+
+## Usage
+
+- Import from `@/components/ui/<component>`
+- Use the `cn()` helper from [lib/utils.ts](mdc:lib/utils.ts) for conditional class names
+- Use **lucide-react** for icons (configured in [components.json](mdc:components.json))
+- Extend shadcn components with Tailwind classes rather than replacing them
+
+```tsx
+import { Button } from "@/components/ui/button"
+
+<Button variant="outline">Save</Button>
+```
+
+## Style
+
+Configured style: **base-nova**, base color: **neutral**, CSS variables enabled. Theme tokens live in [app/globals.css](mdc:app/globals.css).
