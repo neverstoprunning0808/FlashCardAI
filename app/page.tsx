@@ -1,19 +1,26 @@
-import Image from "next/image";
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+export default async function HomePage() {
+  const { userId } = await auth();
+
+  if (userId) {
+    redirect("/dashboard");
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-900">
+    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-900">
       <header className="w-full flex items-center justify-end px-16 py-4 border-b border-zinc-200 dark:border-zinc-800 dark:bg-black">
         <Show when="signed-out">
           <div className="flex gap-3">
-            <SignInButton mode="modal">
-              <button className="flex h-10 items-center justify-center rounded-full border border-solid bg-green-600 border-black/8 px-5 transition-colors hover:border-transparent hover:bg-black/4 dark:border-white/[.145] dark:hover:bg-[#926c6c]">
+            <SignInButton mode="modal" forceRedirectUrl="/dashboard">
+              <button className="flex h-10 items-center justify-center rounded-full border border-solid border-black/4 bg-white px-5 text-black transition-colors hover:bg-zinc-100 dark:border-white/[.145] dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700">
                 Sign In
               </button>
             </SignInButton>
-            <SignUpButton mode="modal">
-              <button className="flex h-10 items-center justify-center rounded-full bg-blue-500 px-5 transition-colors hover:bg-[#645757] dark:hover:bg-[#535283]">
+            <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
+              <button className="flex h-10 items-center justify-center rounded-full bg-black px-5 text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
                 Sign Up
               </button>
             </SignUpButton>
@@ -23,61 +30,28 @@ export default function Home() {
           <UserButton />
         </Show>
       </header>
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-zinc-900 sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+      <main className="flex flex-1 items-center justify-center bg-white dark:bg-zinc-900">
+        <div className="flex flex-col items-center gap-8 text-center">
+          <h1 className="text-5xl font-bold tracking-tight text-black dark:text-zinc-50">
+            Flash Card AI
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-xl text-zinc-600 dark:text-zinc-400">
+            Advance your study with Flashcard platform
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={8}
-              height={8}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          <Show when="signed-out">
+            <div className="flex gap-4 mt-4">
+              <SignInButton mode="modal" forceRedirectUrl="/dashboard">
+                <button className="flex h-12 items-center justify-center rounded-full border border-solid border-black/4 bg-white px-8 text-black transition-colors hover:bg-zinc-100 dark:border-white/[.145] dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700">
+                  Sign In
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
+                <button className="flex h-12 items-center justify-center rounded-full bg-black px-8 text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
+                  Sign Up
+                </button>
+              </SignUpButton>
+            </div>
+          </Show>
         </div>
       </main>
     </div>

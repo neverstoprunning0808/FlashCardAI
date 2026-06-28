@@ -1,9 +1,18 @@
 ---
 alwaysApply: true
 ---
-# shadcn/ui
+# shadcn/ui - STRICT UI COMPONENT POLICY
 
-This project uses **shadcn/ui** for all UI elements. Do not build custom primitives (buttons, inputs, dialogs, etc.) from scratch when a shadcn component exists.
+## CRITICAL REQUIREMENTS
+
+**ABSOLUTELY NO CUSTOM UI COMPONENTS ARE ALLOWED IN THIS PROJECT.**
+
+- **ONLY use shadcn/ui components** for all UI elements
+- **NEVER create custom buttons, inputs, dialogs, cards, forms, or any other UI primitives**
+- **NEVER write custom HTML elements** when a shadcn component exists for that purpose
+- **NEVER use native HTML `<button>`, `<input>`, `<dialog>`, `<select>`, etc.** - use shadcn components instead
+
+If a UI element is needed and a shadcn component exists for it, you MUST use the shadcn component. No exceptions.
 
 ## Setup
 
@@ -21,7 +30,7 @@ Before using a component, check if it exists in [components/ui/](mdc:components/
 npx shadcn@latest add button
 ```
 
-Replace `button` with the component name (e.g., `card`, `dialog`, `input`).
+Replace `button` with the component name (e.g., `card`, `dialog`, `input`, `form`, `select`, `checkbox`, `radio-group`, `tabs`, `accordion`, `alert-dialog`, `popover`, `dropdown-menu`, etc.).
 
 ## Usage
 
@@ -34,6 +43,47 @@ Replace `button` with the component name (e.g., `card`, `dialog`, `input`).
 import { Button } from "@/components/ui/button"
 
 <Button variant="outline">Save</Button>
+```
+
+## Clerk Authentication Integration
+
+**ALL Clerk sign-in and sign-up functionality MUST follow these rules:**
+
+1. **ONLY use shadcn UI Button components** for sign-in/sign-up triggers
+2. **NEVER use Clerk's built-in `<SignInButton>` or `<SignUpButton>` components directly**
+3. **ALWAYS use shadcn Dialog component (modal)** to display Clerk authentication UI
+4. **Use `<SignIn />` and `<SignUp />` Clerk components inside shadcn Dialog**
+
+### Example Implementation
+
+```tsx
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { SignIn, SignUp } from "@clerk/nextjs"
+
+// Sign In
+<Dialog>
+  <DialogTrigger asChild>
+    <Button variant="default">Sign In</Button>
+  </DialogTrigger>
+  <DialogContent>
+    <SignIn />
+  </DialogContent>
+</Dialog>
+
+// Sign Up
+<Dialog>
+  <DialogTrigger asChild>
+    <Button variant="outline">Sign Up</Button>
+  </DialogTrigger>
+  <DialogContent>
+    <SignUp />
+  </DialogContent>
+</Dialog>
 ```
 
 ## Style

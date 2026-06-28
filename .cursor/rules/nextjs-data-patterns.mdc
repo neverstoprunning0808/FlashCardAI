@@ -5,21 +5,35 @@ alwaysApply: true
 
 This project follows strict patterns for data operations and validation.
 
+**ALL database operations MUST go through helper functions in the `db/queries/` directory.**
+
 ## Data Retrieval
 
-All data fetching must be done in **Server Components**:
+All data fetching must be done in **Server Components** via query helper functions:
 
 ```typescript
-// ✅ CORRECT - Server Component
-import { db } from "@/db"
-import { decks } from "@/db/schema"
+// ✅ CORRECT - Server Component calling query helper
 import { auth } from "@clerk/nextjs/server"
+import { getUserDecks } from "@/db/queries/decks"
 
 export default async function DecksPage() {
   const { userId } = await auth()
-  const userDecks = await db.select().from(decks).where(eq(decks.userId, userId))
+  if (!userId) throw new Error("Unauthorized")
+  
+  const userDecks = await getUserDecks(userId)
   
   return <div>{/* render decks */}</div>
+}
+```
+
+```typescript
+// ❌ INCORRECT - Direct database access in Server Component
+import { db } from "@/db"
+import { decks } from "@/db/schema"
+
+export default async function DecksPage() {
+  const userDecks = await db.select().from(decks).where(eq(decks.userId, userId))
+  // Never query the database directly!
 }
 ```
 
@@ -36,19 +50,63 @@ export default function DecksPage() {
 }
 ```
 
-## Data Mutations
+## Query Helper Functions
 
-All database updates, deletes, and inserts must be done via **Server Actions**:
+All database queries must be defined in `db/queries/` directory:
 
 ```typescript
-// ✅ CORRECT - Server Action in separate file
+// ✅ CORRECT - db/queries/decks.ts
+import { db } from "@/db"
+import { decks, cards } from "@/db/schema"
+import { eq, desc } from "drizzle-orm"
+
+export async function getUserDecks(userId: string) {
+  return await db
+    .select()
+    .from(decks)
+    .where(eq(decks.userId, userId))
+    .orderBy(desc(decks.createdAt))
+}
+
+export async function getDeckById(deckId: string, userId: string) {
+  const [deck] = await db
+    .select()
+    .from(decks)
+    .where(eq(decks.id, deckId))
+    .limit(1)
+  
+  if (!deck || deck.userId !== userId) {
+    throw new Error("Deck not found")
+  }
+  
+  return deck
+}
+
+export async function getDeckWithCards(deckId: string, userId: string) {
+  const deck = await getDeckById(deckId, userId)
+  
+  const deckCards = await db
+    .select()
+    .from(cards)
+    .where(eq(cards.deckId, deckId))
+    .orderBy(desc(cards.createdAt))
+  
+  return { ...deck, cards: deckCards }
+}
+```
+
+## Data Mutations
+
+All database updates, deletes, and inserts must be done via **Server Actions** that call mutation helper functions:
+
+```typescript
+// ✅ CORRECT - Server Action calling mutation helper
 "use server"
 
-import { db } from "@/db"
-import { decks } from "@/db/schema"
 import { auth } from "@clerk/nextjs/server"
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
+import { insertDeck } from "@/db/queries/decks"
 
 const createDeckSchema = z.object({
   name: z.string().min(1).max(100),
@@ -63,10 +121,10 @@ export async function createDeck(input: CreateDeckInput) {
   
   const validated = createDeckSchema.parse(input)
   
-  const [deck] = await db.insert(decks).values({
+  const deck = await insertDeck({
     userId,
     ...validated
-  }).returning()
+  })
   
   revalidatePath("/decks")
   return deck
@@ -74,15 +132,69 @@ export async function createDeck(input: CreateDeckInput) {
 ```
 
 ```typescript
+// ❌ INCORRECT - Direct database access in Server Action
+"use server"
+
+export async function createDeck(input: CreateDeckInput) {
+  const [deck] = await db.insert(decks).values(input).returning()
+  // Never query the database directly!
+}
+```
+
+```typescript
 // ❌ INCORRECT - Using FormData type
-export async function createDeck(formData: FormData) { // Don't use FormData as type
-  const name = formData.get("name")
-  // ...
+export async function createDeck(formData: FormData) {
+  // Don't use FormData as type
 }
 
 // ❌ INCORRECT - No validation
-export async function createDeck(input: any) { // Don't skip validation
-  await db.insert(decks).values(input)
+export async function createDeck(input: any) {
+  // Don't skip validation
+}
+```
+
+## Mutation Helper Functions
+
+All database mutations must be defined in `db/queries/` directory:
+
+```typescript
+// ✅ CORRECT - db/queries/decks.ts
+import { db } from "@/db"
+import { decks, cards } from "@/db/schema"
+import { eq } from "drizzle-orm"
+import type { InferInsertModel } from "drizzle-orm"
+
+type NewDeck = InferInsertModel<typeof decks>
+
+export async function insertDeck(data: NewDeck) {
+  const [deck] = await db
+    .insert(decks)
+    .values(data)
+    .returning()
+  
+  return deck
+}
+
+export async function updateDeck(deckId: string, userId: string, data: Partial<NewDeck>) {
+  const [deck] = await db
+    .update(decks)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(decks.id, deckId))
+    .returning()
+  
+  if (!deck || deck.userId !== userId) {
+    throw new Error("Deck not found")
+  }
+  
+  return deck
+}
+
+export async function deleteDeck(deckId: string, userId: string) {
+  const deck = await getDeckById(deckId, userId)
+  
+  await db.delete(decks).where(eq(decks.id, deckId))
+  
+  return deck
 }
 ```
 
@@ -101,28 +213,49 @@ const updateDeckSchema = z.object({
 type UpdateDeckInput = z.infer<typeof updateDeckSchema>
 
 export async function updateDeck(input: UpdateDeckInput) {
-  const validated = updateDeckSchema.parse(input) // Validates and throws on error
-  // ... perform update
+  const validated = updateDeckSchema.parse(input)
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+  
+  const deck = await updateDeckHelper(validated.id, userId, {
+    name: validated.name,
+    description: validated.description
+  })
+  
+  revalidatePath("/decks")
+  return deck
 }
 ```
 
 ## Required Practices
 
-- **Server Components**: Always fetch data in server components, never in client components
-- **Server Actions**: Mark mutation functions with `"use server"` directive
+- **Query Helpers**: ALL database reads must go through helper functions in `db/queries/`
+- **Mutation Helpers**: ALL database writes must go through helper functions in `db/queries/`
+- **No Direct DB Access**: NEVER import and use `db` directly in Server Components or Server Actions
+- **Server Components**: Always fetch data in server components by calling query helpers, never in client components
+- **Server Actions**: Mark mutation functions with `"use server"` directive and call mutation helpers
 - **Zod Schemas**: Define a Zod schema for every server action input
 - **TypeScript Types**: Use `z.infer<typeof schema>` to create TypeScript types from Zod schemas
 - **Validation**: Call `.parse()` or `.safeParse()` on all server action inputs
 - **No FormData Types**: Never use `FormData` as a parameter type; extract and validate data with Zod
 - **Revalidation**: Call `revalidatePath()` or `revalidateTag()` after mutations to update cached data
+- **Authorization**: Check user permissions in query/mutation helpers, not just in Server Actions
 
 ## File Organization
 
 ```
+src/
+├── db/
+│   ├── index.ts           # Database connection
+│   ├── schema.ts          # Table schemas
+│   └── queries/           # Query and mutation helpers
+│       ├── decks.ts       # Deck-related database operations
+│       ├── cards.ts       # Card-related database operations
+│       └── users.ts       # User-related database operations
 app/
 ├── decks/
-│   ├── page.tsx           # Server component (data fetching)
-│   └── actions.ts         # Server actions (mutations)
+│   ├── page.tsx           # Server component (calls query helpers)
+│   └── actions.ts         # Server actions (calls mutation helpers)
 └── components/
     └── deck-form.tsx      # Client component (UI only)
 ```

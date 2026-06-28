@@ -1,6 +1,84 @@
 ---
 alwaysApply: true
 ---
+
+# Clerk Authentication Rules
+
+This project uses **Clerk** for authentication. All authenticated routes must verify the user's identity using Clerk's `auth()` function.
+
+## Core Principles
+
+1. **Always verify authentication** on protected routes and API endpoints
+2. **Never trust client-side state** - always use server-side `auth()` 
+3. **Scope data to users** - all database queries must filter by `userId`
+4. **Redirect unauthenticated users to homepage** - the homepage contains sign-in/sign-up dialog modals
+
+## Authentication Flow
+
+### Server Components
+
+Use `auth()` from `@clerk/nextjs/server` in all protected server components:
+
+```typescript
+import { auth } from "@clerk/nextjs/server"
+import { redirect } from "next/navigation"
+
+export default async function ProtectedPage() {
+  const { userId } = await auth()
+  
+  if (!userId) {
+    redirect("/") // Redirect to homepage where auth dialogs are
+  }
+  
+  // Continue with authenticated logic
+}
+```
+
+### API Routes
+
+Protect API routes by checking authentication first:
+
+```typescript
+import { auth } from "@clerk/nextjs/server"
+import { NextResponse } from "next/server"
+
+export async function GET() {
+  const { userId } = await auth()
+  
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Unauthorized" }, 
+      { status: 401 }
+    )
+  }
+  
+  // Continue with authenticated logic
+}
+```
+
+### Server Actions
+
+Always verify authentication in server actions:
+
+```typescript
+"use server"
+
+import { auth } from "@clerk/nextjs/server"
+import { db } from "@/db"
+import { decks } from "@/db/schema"
+
+export async function createDeck(input: CreateDeckInput) {
+  const { userId } = await auth()
+  
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+  
+  const [deck] = await db
+    .insert(decks)
+    .values({
+      userId,
+      ...input
     })
     .returning()
   
@@ -62,6 +140,14 @@ if (result.length === 0) {
 }
 ```
 
+## Redirect Strategy
+
+**This app does not have dedicated sign-in or sign-up pages.**
+
+- Unauthenticated users attempting to access protected routes should be redirected to `/` (homepage)
+- The homepage contains sign-in and sign-up buttons that open Clerk authentication in shadcn Dialog modals
+- Never redirect to `/sign-in` or `/sign-up` as these routes do not exist
+
 ## Security Checklist
 
 Before committing any data access code, verify:
@@ -73,6 +159,7 @@ Before committing any data access code, verify:
 - [ ] No raw queries expose data across users
 - [ ] API routes return 401 for unauthenticated requests
 - [ ] API routes return 404 for unauthorized resource access
+- [ ] Protected pages redirect to `/` (homepage) for unauthenticated users
 
 ## References
 
