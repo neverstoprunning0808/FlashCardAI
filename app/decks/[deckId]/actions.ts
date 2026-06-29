@@ -164,7 +164,7 @@ export async function generateCardsWithAI(input: GenerateCardsInput) {
   try {
     // Generate flashcards with AI
     const { object } = await generateObject({
-      model: openai('gpt-5-nano'),
+      model: openai('gpt-5-mini'),
       schema: flashcardSchema,
       prompt: `Generate 20 flashcards about the following topic:
       

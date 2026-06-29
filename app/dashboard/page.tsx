@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { UserButton } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getUserDeckCount, getUserDecks, type Deck } from "@/db/queries/decks";
@@ -40,15 +41,26 @@ export default async function DashboardPage() {
               <h1 className="text-4xl font-bold tracking-tight text-black dark:text-zinc-50">
                 Dashboard
               </h1>
-              {hasUnlimitedDecks ? (
+              <div className="flex items-center gap-3">
                 <CreateDeckDialog />
-              ) : deckCount >= 2 ? (
-                <Link href="/pricing">
-                  <Button size="lg">Upgrade to Pro</Button>
-                </Link>
-              ) : (
-                <CreateDeckDialog />
-              )}
+                {hasUnlimitedDecks ? (
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    disabled
+                    className="pointer-events-none gap-2"
+                  >
+                    <Crown className="h-4 w-4" />
+                    Pro
+                  </Button>
+                ) : (
+                  <Link href="/pricing">
+                    <Button variant="outline" size="lg">
+                      Subscribe to Pro
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </div>
             <p className="text-lg text-zinc-600 dark:text-zinc-400">
               Welcome back! Manage your flashcard decks and study sessions.

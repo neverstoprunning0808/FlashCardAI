@@ -2,23 +2,13 @@
 
 A full-stack flashcard learning platform with AI-powered card generation, user authentication, and subscription-based feature gating. Built as a portfolio demo to showcase practical AI engineering skills in a production-style Next.js application.
 
-**Live demo:** _Add your deployed URL here_
+**Live demo:** https://flashcardai-delta.vercel.app 
 
 ---
 
 ## Why This Project
 
-This app demonstrates how to integrate LLMs into a real product—not as a standalone script, but as a secure, typed, user-facing feature inside a modern web stack. It covers the full lifecycle: auth, persistence, billing gates, structured AI output, and a polished UI.
-
-**What a hiring manager can evaluate:**
-
-- End-to-end AI feature design (prompt → structured output → database)
-- Server-side security and authorization patterns
-- SaaS-style monetization with feature flags
-- Clean separation of concerns (queries, actions, components)
-- Type-safe data flow with Zod and Drizzle ORM
-
----
+This app demonstrates how to integrate LLMs into a real product — not as a standalone script, but as a secure, typed, user-facing feature inside a modern web stack. It covers the full lifecycle: auth, persistence, billing gates, structured AI output, and a polished UI.
 
 ## Features
 
