@@ -1,0 +1,253 @@
+---
+alwaysApply: true
+---
+
+# Vercel AI SDK Integration Rules
+
+This project uses the **Vercel AI SDK** (npm package: `ai`) for all AI-powered features, specifically for AI flashcard generation.
+
+## Installation
+
+If not already installed, add the Vercel AI SDK:
+
+```bash
+npm install ai zod
+npm install @ai-sdk/openai
+```
+
+## Core Pattern: Structured Object Generation
+
+All AI features must use the `generateObject` function from the Vercel AI SDK to generate type-safe, validated responses.
+
+### Flashcard Generation Pattern
+
+When generating flashcards, always use this pattern:
+
+```typescript
+import { generateObject } from 'ai'
+import { openai } from '@ai-sdk/openai'
+import { z } from 'zod'
+
+// Define the flashcard schema
+const flashcardSchema = z.object({
+  cards: z.array(
+    z.object({
+      front: z.string().min(1).describe('The question or prompt on the front of the card'),
+      back: z.string().min(1).describe('The answer or explanation on the back of the card'),
+    })
+  ),
+})
+
+// Generate flashcards
+const { object } = await generateObject({
+  model: openai('gpt-5.2'),
+  schema: flashcardSchema,
+  prompt: `Generate ${count} flashcards about ${topic}. 
+    Each card should have a clear question on the front and a concise answer on the back.`,
+})
+
+// Access the generated cards
+const flashcards = object.cards
+```
+
+## Required Practices
+
+### 1. Always Use Zod Schemas
+
+Define a Zod schema for every AI generation task. This ensures type safety and runtime validation:
+
+```typescript
+const schema = z.object({
+  cards: z.array(
+    z.object({
+      front: z.string(),
+      back: z.string(),
+    })
+  ),
+})
+```
+
+### 2. Use TypeScript Types from Schemas
+
+Extract TypeScript types from Zod schemas:
+
+```typescript
+type FlashcardGeneration = z.infer<typeof flashcardSchema>
+type Flashcard = z.infer<typeof flashcardSchema>['cards'][number]
+```
+
+### 3. Server-Side Only
+
+AI generation must **only** happen in:
+- Server Actions (with `"use server"` directive)
+- API Routes
+- Server Components (when appropriate)
+
+**Never call AI generation from client components.**
+
+### 4. Environment Variables
+
+Always use environment variables for API keys:
+
+```typescript
+// .env.local
+OPENAI_API_KEY=sk-...
+```
+
+The Vercel AI SDK automatically reads `OPENAI_API_KEY` from environment variables.
+
+### 5. Error Handling
+
+Always wrap AI generation in try-catch blocks:
+
+```typescript
+"use server"
+
+import { generateObject } from 'ai'
+import { openai } from '@ai-sdk/openai'
+
+export async function generateFlashcards(topic: string, count: number) {
+  try {
+    const { object } = await generateObject({
+      model: openai('gpt-5.2'),
+      schema: flashcardSchema,
+      prompt: `Generate ${count} flashcards about ${topic}`,
+    })
+    
+    return { success: true, cards: object.cards }
+  } catch (error) {
+    console.error('AI generation failed:', error)
+    return { 
+      success: false, 
+      error: 'Failed to generate flashcards. Please try again.' 
+    }
+  }
+}
+```
+
+## Integration with Database
+
+When saving AI-generated flashcards to the database:
+
+1. Generate flashcards with `generateObject`
+2. Validate the output against Zod schema
+3. Use database mutation helpers to insert cards
+4. Always associate cards with the authenticated user
+
+```typescript
+"use server"
+
+import { auth } from "@clerk/nextjs/server"
+import { generateObject } from 'ai'
+import { openai } from '@ai-sdk/openai'
+import { insertCards } from "@/db/queries/cards"
+import { revalidatePath } from "next/cache"
+
+export async function generateAndSaveFlashcards(
+  deckId: string,
+  topic: string,
+  count: number
+) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+  
+  // Check if user has AI generation feature
+  const { has } = await auth()
+  if (!has({ feature: 'ai_flashcard_generation' })) {
+    throw new Error("AI flashcard generation requires a Pro subscription")
+  }
+  
+  // Generate flashcards
+  const { object } = await generateObject({
+    model: openai('gpt-5.2'),
+    schema: flashcardSchema,
+    prompt: `Generate ${count} flashcards about ${topic}`,
+  })
+  
+  // Save to database
+  const savedCards = await insertCards(
+    object.cards.map(card => ({
+      deckId,
+      front: card.front,
+      back: card.back,
+    }))
+  )
+  
+  revalidatePath(`/decks/${deckId}`)
+  return savedCards
+}
+```
+
+## Model Selection
+
+Use OpenAI GPT-5.2 for flashcard generation:
+
+```typescript
+model: openai('gpt-5.2')
+```
+
+Other supported models:
+- `openai('gpt-5.2')` - Latest and most capable (recommended)
+- `openai('gpt-5.1')` - Previous generation
+- `openai('gpt-4-turbo')` - Faster, slightly less capable
+
+## Prompt Engineering Best Practices
+
+When writing prompts for flashcard generation:
+
+1. **Be specific about the number of cards**: "Generate exactly 10 flashcards"
+2. **Describe the format**: "Each card should have a question on the front and answer on the back"
+3. **Specify difficulty level if needed**: "Generate beginner-level flashcards"
+4. **Include context**: "Generate flashcards about React hooks for web developers"
+5. **Use the `describe()` method in Zod schemas** to guide the AI
+
+```typescript
+const schema = z.object({
+  cards: z.array(
+    z.object({
+      front: z.string().describe('A clear, concise question or prompt'),
+      back: z.string().describe('A complete but brief answer'),
+    })
+  ).describe('An array of flashcards for studying'),
+})
+```
+
+## Billing Protection
+
+Always check subscription status before AI generation:
+
+```typescript
+const { has } = await auth()
+
+if (!has({ feature: 'ai_flashcard_generation' })) {
+  throw new Error("AI flashcard generation requires a Pro subscription")
+}
+```
+
+## Streaming (Optional)
+
+For real-time feedback during generation, use `streamObject`:
+
+```typescript
+import { streamObject } from 'ai'
+
+const { partialObjectStream } = await streamObject({
+  model: openai('gpt-5.2'),
+  schema: flashcardSchema,
+  prompt: 'Generate 10 flashcards about TypeScript',
+})
+
+for await (const partialObject of partialObjectStream) {
+  console.log(partialObject.cards?.length ?? 0, 'cards generated so far')
+}
+```
+
+## References
+
+- Vercel AI SDK Documentation: https://sdk.vercel.ai/docs
+- Structured Outputs: https://sdk.vercel.ai/docs/ai-sdk-core/generating-structured-data
+- OpenAI Provider: https://sdk.vercel.ai/providers/ai-sdk-providers/openai
+- Authentication rules: [clerk-auth.mdc](mdc:clerk-auth.mdc)
+- Billing rules: [clerk-billing.mdc](mdc:clerk-billing.mdc)
+- Data patterns: [nextjs-data-patterns.mdc](mdc:nextjs-data-patterns.mdc)
+- Database schema: [src/db/schema.ts](mdc:src/db/schema.ts)

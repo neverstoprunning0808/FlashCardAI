@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { cards, decks } from "@/db/schema";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, asc } from "drizzle-orm";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
 
 export type Card = InferSelectModel<typeof cards>;
@@ -11,7 +11,7 @@ export async function getCardsByDeckId(deckId: number) {
     .select()
     .from(cards)
     .where(eq(cards.deckId, deckId))
-    .orderBy(desc(cards.createdAt));
+    .orderBy(asc(cards.id));
 }
 
 export async function getCardById(cardId: number) {
@@ -45,6 +45,17 @@ export async function insertCard(data: NewCard) {
     .returning();
 
   return card;
+}
+
+export async function insertCards(data: NewCard[]) {
+  if (data.length === 0) return [];
+
+  const insertedCards = await db
+    .insert(cards)
+    .values(data)
+    .returning();
+
+  return insertedCards;
 }
 
 export async function updateCard(

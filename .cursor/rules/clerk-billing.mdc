@@ -1,0 +1,341 @@
+---
+alwaysApply: true
+---
+
+# Clerk Billing Rules
+
+This project uses **Clerk Billing for B2C SaaS** to manage user subscriptions and feature access. All billing functionality must follow these patterns.
+
+## Available Plans
+
+This app has the following subscription plans:
+
+- **`free_user`** - Free tier with limited features
+- **`pro`** - Premium tier with full access
+
+## Available Features
+
+Features are used to gate access to specific functionality:
+
+- **`2_deck_limit`** - Limits users to 2 decks (assigned to `free_user` plan)
+- **`ai_flashcard_generation`** - Enables AI-powered flashcard generation (assigned to `pro` plan)
+- **`unlimited_decks`** - Allows unlimited deck creation (assigned to `pro` plan)
+
+## Core Principles
+
+1. **Always check subscription status** before granting access to premium features
+2. **Use server-side checks** - never trust client-side state for feature access
+3. **Provide clear upgrade paths** - show users how to unlock features they don't have access to
+4. **Graceful degradation** - free users should still have a functional experience
+
+## Access Control Patterns
+
+### Server-Side Access Control with `has()`
+
+Use the `has()` method from `@clerk/nextjs/server` to check plan or feature access in Server Components, Server Actions, and API Routes.
+
+#### Checking Plans
+
+```typescript
+import { auth } from "@clerk/nextjs/server"
+
+export default async function ProContentPage() {
+  const { has } = await auth()
+  
+  const hasProPlan = has({ plan: 'pro' })
+  
+  if (!hasProPlan) {
+    return <UpgradePrompt />
+  }
+  
+  return <PremiumContent />
+}
+```
+
+#### Checking Features
+
+```typescript
+import { auth } from "@clerk/nextjs/server"
+
+export async function generateAIFlashcards() {
+  const { has, userId } = await auth()
+  
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+  
+  const hasAIGeneration = has({ feature: 'ai_flashcard_generation' })
+  
+  if (!hasAIGeneration) {
+    throw new Error("AI flashcard generation requires a Pro subscription")
+  }
+  
+  // Continue with AI generation logic
+}
+```
+
+#### Enforcing Deck Limits
+
+```typescript
+import { auth } from "@clerk/nextjs/server"
+import { getUserDecks } from "@/db/queries/decks"
+
+export async function createDeck(input: CreateDeckInput) {
+  const { has, userId } = await auth()
+  
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+  
+  const hasUnlimitedDecks = has({ feature: 'unlimited_decks' })
+  
+  if (!hasUnlimitedDecks) {
+    const userDecks = await getUserDecks(userId)
+    
+    if (userDecks.length >= 2) {
+      throw new Error("Free users are limited to 2 decks. Upgrade to Pro for unlimited decks.")
+    }
+  }
+  
+  // Continue with deck creation
+}
+```
+
+### Client-Side Access Control with `<Show>`
+
+Use the `<Show>` component from `@clerk/nextjs` to conditionally render UI elements based on plan or feature access.
+
+#### Protecting Features
+
+```tsx
+import { Show } from '@clerk/nextjs'
+
+export function DeckActions() {
+  return (
+    <>
+      <Button>Edit Deck</Button>
+      <Button>Delete Deck</Button>
+      
+      <Show
+        when={{ feature: 'ai_flashcard_generation' }}
+        fallback={
+          <Button disabled>
+            Generate with AI (Pro only)
+          </Button>
+        }
+      >
+        <Button>Generate with AI</Button>
+      </Show>
+    </>
+  )
+}
+```
+
+#### Protecting Entire Sections
+
+```tsx
+import { Show } from '@clerk/nextjs'
+
+export function DashboardPage() {
+  return (
+    <div>
+      <h1>Your Decks</h1>
+      
+      <Show
+        when={{ feature: 'unlimited_decks' }}
+        fallback={
+          <div className="mt-4 p-4 border rounded">
+            <p>You have used X of 2 decks.</p>
+            <Button>Upgrade to Pro</Button>
+          </div>
+        }
+      >
+        <Button>Create New Deck</Button>
+      </Show>
+      
+      <DeckList />
+    </div>
+  )
+}
+```
+
+#### Multiple Conditions
+
+```tsx
+import { Show } from '@clerk/nextjs'
+
+export function FeatureShowcase() {
+  return (
+    <>
+      <Show when={{ plan: 'pro' }}>
+        <ProBadge />
+      </Show>
+      
+      <Show when={{ plan: 'free_user' }}>
+        <UpgradeBanner />
+      </Show>
+    </>
+  )
+}
+```
+
+## Pricing Page
+
+The pricing page should use the `<PricingTable />` component to display available plans and allow users to subscribe.
+
+```tsx
+import { PricingTable } from '@clerk/nextjs'
+
+export default function PricingPage() {
+  return (
+    <div className="max-w-4xl mx-auto p-8">
+      <h1>Choose Your Plan</h1>
+      <PricingTable />
+    </div>
+  )
+}
+```
+
+## User Profile Integration
+
+Clerk's `<UserProfile />` component automatically includes billing management for users. Make sure to include it in your app:
+
+```tsx
+import { UserProfile } from '@clerk/nextjs'
+
+export default function ProfilePage() {
+  return (
+    <div className="max-w-2xl mx-auto p-8">
+      <UserProfile />
+    </div>
+  )
+}
+```
+
+## API Route Protection
+
+Always verify feature access in API routes before performing premium operations:
+
+```typescript
+import { auth } from "@clerk/nextjs/server"
+import { NextResponse } from "next/server"
+
+export async function POST(request: Request) {
+  const { has, userId } = await auth()
+  
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    )
+  }
+  
+  const hasAIGeneration = has({ feature: 'ai_flashcard_generation' })
+  
+  if (!hasAIGeneration) {
+    return NextResponse.json(
+      { 
+        error: "AI flashcard generation requires a Pro subscription",
+        upgradeRequired: true 
+      },
+      { status: 403 }
+    )
+  }
+  
+  // Continue with AI generation logic
+}
+```
+
+## Best Practices
+
+1. **Check at multiple levels**: Validate access in both UI (UX) and server-side (security)
+2. **Clear messaging**: Always explain why a feature is locked and how to unlock it
+3. **Soft limits**: Warn users before they hit limits (e.g., "1 of 2 decks used")
+4. **Graceful errors**: Return helpful error messages that guide users to upgrade
+5. **Consistent patterns**: Use `has()` in server code, `<Show>` in client components
+6. **Test both plans**: Always test features as both free and pro users
+7. **Document features**: Keep plan features clearly documented in code and dashboard
+
+## Common Patterns
+
+### Creating Resources with Limits
+
+```typescript
+"use server"
+
+import { auth } from "@clerk/nextjs/server"
+import { getUserDecks } from "@/db/queries/decks"
+import { insertDeck } from "@/db/queries/decks"
+
+export async function createDeck(input: CreateDeckInput) {
+  const { has, userId } = await auth()
+  
+  if (!userId) throw new Error("Unauthorized")
+  
+  // Check if user has unlimited decks feature
+  const hasUnlimitedDecks = has({ feature: 'unlimited_decks' })
+  
+  if (!hasUnlimitedDecks) {
+    const existingDecks = await getUserDecks(userId)
+    
+    if (existingDecks.length >= 2) {
+      throw new Error("Free plan limited to 2 decks. Upgrade to Pro for unlimited decks.")
+    }
+  }
+  
+  const deck = await insertDeck({ userId, ...input })
+  revalidatePath("/dashboard")
+  
+  return deck
+}
+```
+
+### Conditional UI Rendering
+
+```tsx
+import { Show } from '@clerk/nextjs'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogTrigger } from '@/components/ui/dialog'
+
+export function CreateDeckButton() {
+  return (
+    <Show
+      when={{ feature: 'unlimited_decks' }}
+      fallback={
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline">
+              Upgrade to Create More Decks
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <UpgradePrompt feature="unlimited_decks" />
+          </DialogContent>
+        </Dialog>
+      }
+    >
+      <Button>Create New Deck</Button>
+    </Show>
+  )
+}
+```
+
+## Security Checklist
+
+Before implementing any premium feature, verify:
+
+- [ ] Server-side `has()` check prevents unauthorized access
+- [ ] Client-side `<Show>` component provides appropriate UI/UX
+- [ ] Error messages guide users to upgrade when needed
+- [ ] API routes return 403 (Forbidden) for feature access denials
+- [ ] Database queries respect user's plan limits
+- [ ] Free users can't bypass limits through direct API calls
+- [ ] Premium features are clearly marked in the UI
+
+## References
+
+- Clerk Billing Documentation: https://clerk.com/docs/billing
+- Clerk `has()` method: https://clerk.com/docs/reference/backend/types/auth-object#has
+- Clerk `<Show>` component: https://clerk.com/docs/nextjs/reference/components/control/show
+- Authentication rules: [clerk-auth.mdc](mdc:clerk-auth.mdc)
+- Database patterns: [nextjs-data-patterns.mdc](mdc:nextjs-data-patterns.mdc)
