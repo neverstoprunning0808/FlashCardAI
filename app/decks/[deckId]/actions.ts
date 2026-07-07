@@ -143,20 +143,13 @@ const flashcardSchema = z.object({
 });
 
 export async function generateCardsWithAI(input: GenerateCardsInput) {
-  const { has, userId } = await auth();
+  const { userId } = await auth();
   
   if (!userId) {
     throw new Error("Unauthorized");
   }
 
   const validated = generateCardsSchema.parse(input);
-
-  // Check if user has AI generation feature
-  const hasAIGeneration = has({ feature: 'ai_flashcard_generation' });
-  
-  if (!hasAIGeneration) {
-    throw new Error("AI flashcard generation requires a Pro subscription");
-  }
 
   // Verify user owns the deck and get deck details
   const deck = await getDeckById(validated.deckId, userId);
@@ -166,12 +159,12 @@ export async function generateCardsWithAI(input: GenerateCardsInput) {
     const { object } = await generateObject({
       model: openai('gpt-5-mini'),
       schema: flashcardSchema,
-      prompt: `Generate 20 flashcards about the following topic:
+      prompt: `Generate 10 flashcards about the following topic:
       
 Title: ${deck.name}
 ${deck.description ? `Description: ${deck.description}` : ''}
 
-Create 20 educational flashcards that cover key concepts, facts, and important details about this topic. 
+Create 10 educational flashcards that cover key concepts, facts, and important details about this topic. 
 Each card should have a clear question on the front and a concise, accurate answer on the back.
 Make sure the cards are varied and cover different aspects of the topic.`,
     });

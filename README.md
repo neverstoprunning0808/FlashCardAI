@@ -20,7 +20,7 @@ This app demonstrates how to integrate LLMs into a real product — not as a sta
 
 ### AI-Powered Generation (Pro)
 
-- **One-click generation** — Pro users can generate 20 flashcards from a deck's title and description
+- **One-click generation** — Pro users can generate 10 flashcards from a deck's title and description
 - **Structured outputs** — Uses the Vercel AI SDK with Zod schemas so LLM responses are validated before saving
 
 ### Authentication & Billing
@@ -31,7 +31,7 @@ This app demonstrates how to integrate LLMs into a real product — not as a sta
 
 | Plan | Decks | AI Generation |
 |------|-------|---------------|
-| Free | Up to 2 | No |
+| Free | Up to 2 | Yes |
 | Pro  | Unlimited | Yes |
 
 ---

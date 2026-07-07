@@ -1,13 +1,6 @@
 "use client";
 
-import { Show } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { generateCardsWithAI } from "./actions";
@@ -39,44 +32,15 @@ export function GenerateAICardsButton({ deckId }: GenerateAICardsButtonProps) {
     }
   };
 
-  const handleUpgradeClick = () => {
-    router.push("/pricing");
-  };
-
   return (
-    <>
-      <Show
-        when={{ feature: "ai_flashcard_generation" }}
-        fallback={
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={handleUpgradeClick}
-                >
-                  <Sparkles className="h-5 w-5" />
-                  Generate with AI
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>AI flashcard generation is a Pro feature</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        }
-      >
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={handleGenerate}
-          disabled={isGenerating}
-        >
-          <Sparkles className="h-5 w-5" />
-          {isGenerating ? "Generating..." : "Generate with AI"}
-        </Button>
-      </Show>
-    </>
+    <Button
+      variant="outline"
+      size="lg"
+      onClick={handleGenerate}
+      disabled={isGenerating}
+    >
+      <Sparkles className="h-5 w-5" />
+      {isGenerating ? "Generating..." : "Generate with AI"}
+    </Button>
   );
 }
